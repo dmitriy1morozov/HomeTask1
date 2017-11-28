@@ -18,9 +18,8 @@
         </activity>
 
         <service
-            android:name=".BackgroundService"
-            android:enabled="true"
-            android:exported="true"></service>
+            android:name=".BackgroundIntentService"
+            android:exported="false"/>
     </application>
 
 </manifest>
