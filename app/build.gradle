@@ -1,0 +1,53 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion project.ext.myCompileSdkVersion
+    buildToolsVersion project.ext.myBuildToolsVersion
+
+    defaultConfig {
+        applicationId "com.example.dmitriymorozov.hometask1"
+        minSdkVersion project.ext.myMinSdkVersion
+        targetSdkVersion project.ext.myTargetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    // Tests
+    androidTestCompile(tests.espresso,
+            {
+                exclude group: 'com.android.support', module: 'support-annotations'
+            })
+    testCompile tests.junit
+
+    // Android support
+    compile support.appcompat7
+    compile support.support4
+    compile support.design
+    compile support.constraintLayout
+
+    // ButterKnife
+    compile jakewharton.butterknife
+    annotationProcessor jakewharton.butterknifeCompiler
+
+    //Retrofit
+    compile squareup.retrofit
+    compile squareup.converterGson
+
+    //Annotations for Java SE5
+    compile annotation.annotation
+
+    //Glide
+    compile bumpertech.glide
+    annotationProcessor bumpertech.compiler
+}
