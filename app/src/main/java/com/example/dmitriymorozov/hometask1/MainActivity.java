@@ -18,8 +18,8 @@ import butterknife.OnClick;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MyLogs MainActivity";
 
-    private static final boolean FLAG_PLAY = true;
-    private static final boolean FLAG_STOP = false;
+    public static final String KEY_CURRENT_IMAGE_ID = "mCurrentImageId";
+    public static final String KEY_IS_SLIDESHOW_RUNNING = "isSlideShowRunning";
 
     @BindView(R.id.image_main_slide)
     ImageView mSlideImage;
@@ -30,29 +30,89 @@ public class MainActivity extends AppCompatActivity {
     @BindView(R.id.btn_main_next)
     Button mNextButton;
 
+    boolean isSlideShowRunning = false;
+    private Uri mBaseUri;
+    private int mCurrentImageId;
+
+    //----------------------------------------------------------------------------------------------
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if(savedInstanceState != null){
+            isSlideShowRunning = savedInstanceState.getBoolean(KEY_IS_SLIDESHOW_RUNNING);
+            mCurrentImageId = savedInstanceState.getInt(KEY_CURRENT_IMAGE_ID);
+        } else{
+            isSlideShowRunning = false;
+            mCurrentImageId = R.raw.cat1;
+        }
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
-        mSlideshowButton.setTag(FLAG_STOP);
-
-        Uri uri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.cat1);
-        Glide.with(this).load(uri).into(mSlideImage);
+        mBaseUri = Uri.parse("android.resource://" + getPackageName() + "/");
+        Uri currentImageUri = Uri.parse(mBaseUri.toString() + mCurrentImageId);
+        Glide.with(this).load(currentImageUri).into(mSlideImage);
     }
 
+    @Override
+    protected void onResume() {
+        if(isSlideShowRunning){
+            startSlideShow();
+        }
+        super.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        if(isSlideShowRunning){
+            stopSlideShow();
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean(KEY_IS_SLIDESHOW_RUNNING, isSlideShowRunning);
+        outState.putInt(KEY_CURRENT_IMAGE_ID, mCurrentImageId);
+        super.onSaveInstanceState(outState);
+    }
+
+    //----------------------------------------------------------------------------------------------
     private void previousImage() {
-        Log.d(TAG, "previousImage: ");
+        if(mCurrentImageId <= R.raw.cat1){
+            mCurrentImageId = R.raw.cat5;
+        } else{
+            mCurrentImageId--;
+        }
+
+        Uri newImageUri = Uri.parse(mBaseUri.toString() + mCurrentImageId);
+        Glide.with(this).load(newImageUri).into(mSlideImage);
     }
     private void nextImage() {
-        Log.d(TAG, "nextImage: ");
+        if(mCurrentImageId >= R.raw.cat5){
+            mCurrentImageId = R.raw.cat1;
+        } else{
+            mCurrentImageId++;
+        }
+
+        Uri newImageUri = Uri.parse(mBaseUri.toString() + mCurrentImageId);
+        Glide.with(this).load(newImageUri).into(mSlideImage);
+    }
+    private void startSlideShow(){
+        Intent slideShow = new Intent(this, SlideShowService.class);
+        Uri currentImage = Uri.parse(mBaseUri.toString() + mCurrentImageId);
+        slideShow.putExtra("currentImage", currentImage);
+        startService(slideShow);
+        mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_pause));
+    }
+    private void stopSlideShow(){
+        stopService(new Intent(this, SlideShowService.class));
+        mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_play));
     }
 
     //----------------------------------------------------------------------------------------------
 
     @OnClick(R.id.btn_main_previous)public void btnPreviousClick(){
-        if((boolean)mSlideshowButton.getTag() == FLAG_PLAY){
+        if(isSlideShowRunning){
             stopService(new Intent(this, SlideShowService.class));
             previousImage();
             startService(new Intent(this, SlideShowService.class));
@@ -62,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @OnClick(R.id.btn_main_next)public void btnNextClick(){
-        if((boolean)mSlideshowButton.getTag() == FLAG_PLAY){
+        if(isSlideShowRunning){
             stopService(new Intent(this, SlideShowService.class));
             nextImage();
             startService(new Intent(this, SlideShowService.class));
@@ -72,20 +132,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @OnClick(R.id.btn_main_slideshow)public void slideShow(View view){
-        if(view.getTag() == null){
-            view.setTag(FLAG_STOP);
-        } else{
-            boolean isPlaying = (boolean)view.getTag();
-            view.setTag(!isPlaying);
-        }
+        isSlideShowRunning = !isSlideShowRunning;
 
-
-        if((boolean)view.getTag() == FLAG_PLAY){
-            startService(new Intent(this, SlideShowService.class));
-            view.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_pause));
+        if(isSlideShowRunning){
+            startSlideShow();
         } else{
-            stopService(new Intent(this, SlideShowService.class));
-            view.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_play));
+            stopSlideShow();
         }
     }
 }
