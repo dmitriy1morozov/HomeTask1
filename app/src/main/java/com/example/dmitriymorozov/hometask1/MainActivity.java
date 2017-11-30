@@ -79,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
             view.setTag(!isPlaying);
         }
 
+        Intent slideShow = new Intent(this, SlideShowService.class);
 
         if((boolean)view.getTag() == FLAG_PLAY){
             startService(new Intent(this, SlideShowService.class));
