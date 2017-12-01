@@ -1,11 +1,7 @@
 package com.example.hometask1;
 
-
 import android.net.Uri;
 import android.util.Log;
-
-import org.json.JSONObject;
-
 
 public class MyThread extends Thread {
     private static final String TAG = "MyLogs MyThread";
