@@ -89,10 +89,7 @@ public class SlideShowService extends Service implements OnNextImageListener {
                 stopSlideShow();
                 startSlideShowThread();
             }
-
-            Intent broadcast = new Intent(MainActivity.BROADCAST_ACTION);
-            broadcast.putExtra("uri", mCurrentImageUri);
-            sendBroadcast(broadcast);
+            
         }
 
         public void previousImage(Uri currentImageUri) {
