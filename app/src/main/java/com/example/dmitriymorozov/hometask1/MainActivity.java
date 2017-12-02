@@ -10,6 +10,7 @@ import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -22,12 +23,12 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity{
     private static final String TAG = "MyLogs MainActivity";
 
     public static final String KEY_CURRENT_IMAGE_URI = "mCurrentImageUri";
     public static final String KEY_IS_SLIDESHOW_RUNNING = "isSlideShowRunning";
-    public static final String BROADCAST_ACTION = "com.example.dmitriymorozov.hometask1.SLIDE_UPDATE";
+    public static final String INTENT_FILTER_RECEIVED_IMAGE = "image received from SlideShowService";
 
     @BindView(R.id.image_main_slide)
     ImageView mSlideImage;
@@ -40,6 +41,7 @@ public class MainActivity extends AppCompatActivity {
 
     boolean isSlideShowRunning;
     private Uri mCurrentImageUri;
+    private BroadcastReceiver mLocalBroadcastReceiver;
 
     private SlideShowService.LocalBinder mBinder;
     private ServiceConnection mServiceConnection = new ServiceConnection() {
@@ -55,14 +57,6 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onServiceDisconnected(ComponentName name) {
             mBinder = null;
-        }
-    };
-
-    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            mCurrentImageUri = intent.getParcelableExtra("uri");
-            Glide.with(mSlideImage).load(mCurrentImageUri).into(mSlideImage);
         }
     };
 
@@ -91,7 +85,16 @@ public class MainActivity extends AppCompatActivity {
         startService(slideShow);
         bindService(new Intent(this, SlideShowService.class), mServiceConnection,
                 Service.BIND_AUTO_CREATE);
-        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION));
+
+        mLocalBroadcastReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                Log.d(TAG, "onReceive: Received a new image in LocalBroadcastManager");
+                mCurrentImageUri = intent.getParcelableExtra("uri");
+                Glide.with(mSlideImage).load(mCurrentImageUri).into(mSlideImage);
+            }
+        };
+        LocalBroadcastManager.getInstance(this).registerReceiver(mLocalBroadcastReceiver,
+            new IntentFilter(INTENT_FILTER_RECEIVED_IMAGE));
     }
 
     @Override
@@ -115,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
         unbindService(mServiceConnection);
         stopService(new Intent(this, SlideShowService.class));
         mBinder = null;
-        unregisterReceiver(mBroadcastReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mLocalBroadcastReceiver);
     }
 
     @Override
