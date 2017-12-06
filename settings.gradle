@@ -1,1 +1,1 @@
-include ':app', ':simpleBinder'
+include ':app', ':hamer', ':systemservice_broadcastreceiver_example', ':databinding'

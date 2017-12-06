@@ -1,21 +1,20 @@
 package com.example.dmitriymorozov.hometask1;
 
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
 import android.net.Uri;
 import android.os.IBinder;
-import android.os.ResultReceiver;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import java.lang.ref.WeakReference;
 
-public class SlideShowService extends Service implements OnNextImageListener {
+public class SlideShowService extends Service {
 		private static final String TAG = "MyLogs SlideShowService";
 
 		private SlideShowThread mSlideShowThread;
 		private Uri mCurrentImageUri;
+		private WeakReference<OnNextImageListener> mOnNextImageListenerRef;
 
 		public SlideShowService() {
 		}
@@ -40,13 +39,6 @@ public class SlideShowService extends Service implements OnNextImageListener {
 						mSlideShowThread.interrupt();
 						mSlideShowThread = null;
 				}
-		}
-
-		@Override public void onNextImageReceived(Uri nextImage) {
-				mCurrentImageUri = nextImage;
-				Intent localBroadcastIntent = new Intent(MainActivity.INTENT_FILTER_RECEIVED_IMAGE);
-				localBroadcastIntent.putExtra("uri", mCurrentImageUri);
-				LocalBroadcastManager.getInstance(this).sendBroadcast(localBroadcastIntent);
 		}
 
 		//----------------------------------------------------------------------------------------------
@@ -77,8 +69,10 @@ public class SlideShowService extends Service implements OnNextImageListener {
 		}
 
 		private void startSlideShowThread() {
-				mSlideShowThread = new SlideShowThread(mCurrentImageUri, this);
-				mSlideShowThread.start();
+				if(mOnNextImageListenerRef != null && mOnNextImageListenerRef.get() != null){
+						mSlideShowThread = new SlideShowThread(mCurrentImageUri, mOnNextImageListenerRef.get());
+						mSlideShowThread.start();
+				}
 		}
 
 		//----------------------------------------------------------------------------------------------
@@ -90,7 +84,9 @@ public class SlideShowService extends Service implements OnNextImageListener {
 								stopSlideShow();
 								startSlideShowThread();
 						}
-						onNextImageReceived(mCurrentImageUri);
+						if(mOnNextImageListenerRef != null && mOnNextImageListenerRef.get() != null){
+								mOnNextImageListenerRef.get().onNextImageReceived(mCurrentImageUri);
+						}
 				}
 
 				public void previousImage(Uri currentImageUri) {
@@ -100,7 +96,9 @@ public class SlideShowService extends Service implements OnNextImageListener {
 								stopSlideShow();
 								startSlideShowThread();
 						}
-						onNextImageReceived(mCurrentImageUri);
+						if(mOnNextImageListenerRef != null && mOnNextImageListenerRef.get() != null){
+								mOnNextImageListenerRef.get().onNextImageReceived(mCurrentImageUri);
+						}
 				}
 
 				public void stopSlideShow() {
@@ -114,6 +112,10 @@ public class SlideShowService extends Service implements OnNextImageListener {
 				public void startSlideShow(Uri currentImageUri) {
 						mCurrentImageUri = currentImageUri;
 						startSlideShowThread();
+				}
+
+				public void setOnNextImageListener(OnNextImageListener onNextImageListener){
+						mOnNextImageListenerRef = new WeakReference<>(onNextImageListener);
 				}
 		}
 }

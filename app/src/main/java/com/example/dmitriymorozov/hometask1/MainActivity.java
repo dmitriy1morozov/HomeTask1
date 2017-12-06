@@ -23,31 +23,26 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
-public class MainActivity extends AppCompatActivity{
+public class MainActivity extends AppCompatActivity implements OnNextImageListener{
     private static final String TAG = "MyLogs MainActivity";
 
     public static final String KEY_CURRENT_IMAGE_URI = "mCurrentImageUri";
     public static final String KEY_IS_SLIDESHOW_RUNNING = "isSlideShowRunning";
-    public static final String INTENT_FILTER_RECEIVED_IMAGE = "image received from SlideShowService";
 
-    @BindView(R.id.image_main_slide)
-    ImageView mSlideImage;
-    @BindView(R.id.btn_main_previous)
-    Button mPreviousButton;
-    @BindView(R.id.btn_main_slideshow)
-    Button mSlideshowButton;
-    @BindView(R.id.btn_main_next)
-    Button mNextButton;
+    @BindView(R.id.image_main_slide) ImageView mSlideImage;
+    @BindView(R.id.btn_main_previous) Button mPreviousButton;
+    @BindView(R.id.btn_main_slideshow) Button mSlideshowButton;
+    @BindView(R.id.btn_main_next) Button mNextButton;
 
     boolean isSlideShowRunning;
     private Uri mCurrentImageUri;
-    private BroadcastReceiver mLocalBroadcastReceiver;
 
     private SlideShowService.LocalBinder mBinder;
     private ServiceConnection mServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             mBinder = (SlideShowService.LocalBinder) service;
+            mBinder.setOnNextImageListener(MainActivity.this);
             Log.d(TAG, "onServiceConnected. Binded!");
             if(isSlideShowRunning) {
                 startSlideShow();
@@ -82,19 +77,8 @@ public class MainActivity extends AppCompatActivity{
 
         Intent slideShow = new Intent(this, SlideShowService.class);
         slideShow.putExtra("uri", mCurrentImageUri);
-        startService(slideShow);
         bindService(new Intent(this, SlideShowService.class), mServiceConnection,
-                Service.BIND_AUTO_CREATE);
-
-        mLocalBroadcastReceiver = new BroadcastReceiver() {
-            @Override public void onReceive(Context context, Intent intent) {
-                Log.d(TAG, "onReceive: Received a new image in LocalBroadcastManager");
-                mCurrentImageUri = intent.getParcelableExtra("uri");
-                Glide.with(mSlideImage).load(mCurrentImageUri).into(mSlideImage);
-            }
-        };
-        LocalBroadcastManager.getInstance(this).registerReceiver(mLocalBroadcastReceiver,
-            new IntentFilter(INTENT_FILTER_RECEIVED_IMAGE));
+            Service.BIND_AUTO_CREATE);
     }
 
     @Override
@@ -116,9 +100,7 @@ public class MainActivity extends AppCompatActivity{
     protected void onStop() {
         super.onStop();
         unbindService(mServiceConnection);
-        stopService(new Intent(this, SlideShowService.class));
         mBinder = null;
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(mLocalBroadcastReceiver);
     }
 
     @Override
@@ -128,6 +110,15 @@ public class MainActivity extends AppCompatActivity{
         outState.putParcelable(KEY_CURRENT_IMAGE_URI, mCurrentImageUri);
     }
 
+    @Override public void onNextImageReceived(Uri nextImage) {
+        Log.d(TAG, "onReceive: a new image in onNextImageReceived callback");
+        mCurrentImageUri = nextImage;
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+		            Glide.with(mSlideImage).load(mCurrentImageUri).into(mSlideImage);
+            }
+        });
+    }
     //----------------------------------------------------------------------------------------------
     private void startSlideShow() {
         mBinder.startSlideShow(mCurrentImageUri);
@@ -137,7 +128,7 @@ public class MainActivity extends AppCompatActivity{
     private void stopSlideShow() {
         mBinder.stopSlideShow();
         mSlideshowButton.setBackground(
-                this.getResources().getDrawable(android.R.drawable.ic_media_play));
+            this.getResources().getDrawable(android.R.drawable.ic_media_play));
     }
 
     //----------------------------------------------------------------------------------------------

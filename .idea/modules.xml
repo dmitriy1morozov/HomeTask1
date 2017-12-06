@@ -4,7 +4,9 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/HomeTask1.iml" filepath="$PROJECT_DIR$/HomeTask1.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/simpleBinder/simpleBinder.iml" filepath="$PROJECT_DIR$/simpleBinder/simpleBinder.iml" />
+      <module fileurl="file://$PROJECT_DIR$/databinding/databinding.iml" filepath="$PROJECT_DIR$/databinding/databinding.iml" />
+      <module fileurl="file://$PROJECT_DIR$/hamer/hamer.iml" filepath="$PROJECT_DIR$/hamer/hamer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/systemservice_broadcastreceiver_example/systemservice_broadcastreceiver_example.iml" filepath="$PROJECT_DIR$/systemservice_broadcastreceiver_example/systemservice_broadcastreceiver_example.iml" />
     </modules>
   </component>
 </project>

@@ -9,7 +9,9 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
-            <option value="$PROJECT_DIR$/simpleBinder" />
+            <option value="$PROJECT_DIR$/databinding" />
+            <option value="$PROJECT_DIR$/hamer" />
+            <option value="$PROJECT_DIR$/systemservice_broadcastreceiver_example" />
           </set>
         </option>
         <option name="resolveModulePerSourceSet" value="false" />
