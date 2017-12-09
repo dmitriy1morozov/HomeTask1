@@ -5,10 +5,10 @@
       <root url="file://$USER_HOME$/.gradle/caches/transforms-1/files-1.1/animated-vector-drawable-25.0.0.aar/e3d8291beab3401af54dc3cd2ac9b5f0/res" />
     </CLASSES>
     <JAVADOC>
-      <root url="jar://C:/SDK/extras/android/m2repository/com/android/support/animated-vector-drawable/25.0.0/animated-vector-drawable-25.0.0-javadoc.jar!/" />
+      <root url="jar://$USER_HOME$/AppData/Local/Android/Sdk/extras/android/m2repository/com/android/support/animated-vector-drawable/25.0.0/animated-vector-drawable-25.0.0-javadoc.jar!/" />
     </JAVADOC>
     <SOURCES>
-      <root url="jar://C:/SDK/extras/android/m2repository/com/android/support/animated-vector-drawable/25.0.0/animated-vector-drawable-25.0.0-sources.jar!/" />
+      <root url="jar://$USER_HOME$/AppData/Local/Android/Sdk/extras/android/m2repository/com/android/support/animated-vector-drawable/25.0.0/animated-vector-drawable-25.0.0-sources.jar!/" />
     </SOURCES>
   </library>
 </component>

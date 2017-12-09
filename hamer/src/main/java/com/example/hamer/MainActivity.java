@@ -33,15 +33,11 @@ MainActivity extends AppCompatActivity{
 
 				@Override public void handleMessage(Message msg) {
 						Uri newImageUri = msg.getData().getParcelable("uri");
-						boolean shouldStopService = msg.getData().getBoolean("shouldStopService");
 						Log.d(TAG, "handleMessage: newImageUri = " + newImageUri);
 						MainActivity activity = mActivity.get();
 						if(activity != null){
 								activity.mCurrentImageUri = newImageUri;
 								Glide.with(activity).load(newImageUri).into(activity.mSlideImage);
-								if(shouldStopService){
-										activity.stopMyService();
-								}
 						}
 				}
 		}
@@ -57,7 +53,8 @@ MainActivity extends AppCompatActivity{
 		@BindView(R.id.btn_main_slideshow) Button mSlideshowButton;
 		@BindView(R.id.btn_main_next) Button mNextButton;
 
-		boolean isSlideShowRunning;
+		private boolean isSlideShowRunning;
+		private byte mAction = -1;
 		private Uri mCurrentImageUri;
 
 		private Messenger mServiceMessenger;
@@ -67,7 +64,9 @@ MainActivity extends AppCompatActivity{
 				public void onServiceConnected(ComponentName name, IBinder service) {
 						Log.d(TAG, "onServiceConnected: Binded with service");
 						mServiceMessenger = new Messenger(service);
-						sendInitialData();
+						if(mAction != -1){
+								sendCommandToService();
+						}
 				}
 				@Override
 				public void onServiceDisconnected(ComponentName name) {
@@ -94,18 +93,21 @@ MainActivity extends AppCompatActivity{
 		@Override
 		protected void onResume() {
 				super.onResume();
+				Log.d(TAG, "onResume: startMyService");
 				if(isSlideShowRunning){
-						Log.d(TAG, "onResume: startMyService");
-						startMyService(SlideShowService.ACTION_SLIDESHOW);
+						mAction = SlideShowService.ACTION_SLIDESHOW_START;
+						startMyService();
+						mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_pause));
 				}
 		}
 
 		@Override
 		protected void onPause() {
 				super.onPause();
+				Log.d(TAG, "onPause: stopMyService");
+				stopMyService();
 				if (isSlideShowRunning) {
-						Log.d(TAG, "onPause: stopMyService");
-						stopMyService();
+						mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_play));
 				}
 		}
 
@@ -116,71 +118,78 @@ MainActivity extends AppCompatActivity{
 				outState.putParcelable(KEY_CURRENT_IMAGE_URI, mCurrentImageUri);
 		}
 		//----------------------------------------------------------------------------------------------
-		private void startMyService(String action) {
+		private void startMyService() {
 				Intent slideShow = new Intent(this, SlideShowService.class);
-				slideShow.setAction(action);
 				//TODO не понял зачем в примере следующие две строчки
 				//slideShow.setPackage(getApplicationContext().getPackageName());
 				//slideShow.setClass(this, SlideShowService.class);
 				bindService(slideShow, mServiceConnection, Service.BIND_AUTO_CREATE);
 				Log.d(TAG, "startMyService: bindService Requested");
+		}
 
-				if(action == SlideShowService.ACTION_SLIDESHOW){
-						mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_pause));
+		private void stopMyService() {
+				if(mServiceMessenger != null){
+						unbindService(mServiceConnection);
 				}
 		}
 
-		private void sendInitialData(){
+		private void sendCommandToService(){
+				Log.d(TAG, "sendCommandToService: mAction = " + mAction);
 				Message message = Message.obtain();
 				message.replyTo = mClientMessenger;
 				Bundle bundle = new Bundle();
+				bundle.putByte("action", mAction);
 				bundle.putParcelable("uri", mCurrentImageUri);
 				message.setData(bundle);
 				try {
 						mServiceMessenger.send(message);
 				} catch (RemoteException re) {
-						Log.d(TAG, "sendInitialData: " + re.getMessage());
+						Log.d(TAG, "sendCommandToService: " + re.getMessage());
 				}
-		}
 
-		private void stopMyService() {
-				unbindService(mServiceConnection);
-				mSlideshowButton.setBackground(
-						this.getResources().getDrawable(android.R.drawable.ic_media_play));
+				//Reset one-time actions
+				if(mAction == SlideShowService.ACTION_NEXT_IMAGE || mAction == SlideShowService.ACTION_PREVIOUS_IMAGE){
+						mAction = -1;
+				}
 		}
 		//----------------------------------------------------------------------------------------------
 
 		@OnClick(R.id.btn_main_previous)
 		public void btnPreviousClick() {
-				if(isSlideShowRunning){
-						//TODO Interrupt the SlideShow, previous Image processing, restart SlideShow.
-						//stopMyService();
-						//startMyService(SlideShowService.ACTION_PREVIOUS_IMAGE);
-						//startMyService(SlideShowService.ACTION_SLIDESHOW);
-				} else{
-						startMyService(SlideShowService.ACTION_PREVIOUS_IMAGE);
+				mAction = SlideShowService.ACTION_PREVIOUS_IMAGE;
+				if(mServiceMessenger == null){
+						startMyService();
+				}else{
+						sendCommandToService();
 				}
 		}
 
 		@OnClick(R.id.btn_main_next)
 		public void btnNextClick() {
-				if(isSlideShowRunning){
-						//TODO Interrupt the SlideShow, next Image processing, restart SlideShow.
-						//stopMyService();
-						//startMyService(SlideShowService.ACTION_NEXT_IMAGE);
-						//startMyService(SlideShowService.ACTION_SLIDESHOW);
-				} else{
-						startMyService(SlideShowService.ACTION_NEXT_IMAGE);
+				mAction = SlideShowService.ACTION_NEXT_IMAGE;
+				if(mServiceMessenger == null){
+						startMyService();
+				}else{
+						sendCommandToService();
 				}
 		}
 
 		@OnClick(R.id.btn_main_slideshow)
 		public void slideShow(View view) {
 				isSlideShowRunning = !isSlideShowRunning;
+
 				if (isSlideShowRunning) {
-						startMyService(SlideShowService.ACTION_SLIDESHOW);
+						mAction = SlideShowService.ACTION_SLIDESHOW_START;
+						if(mServiceMessenger == null){
+								startMyService();
+						}else{
+								sendCommandToService();
+						}
+						mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_pause));
 				} else {
+						mAction = -1;
 						stopMyService();
+						mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_play));
 				}
 		}
 }

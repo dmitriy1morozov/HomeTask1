@@ -77,8 +77,7 @@ public class MainActivity extends AppCompatActivity implements OnNextImageListen
 
         Intent slideShow = new Intent(this, SlideShowService.class);
         slideShow.putExtra("uri", mCurrentImageUri);
-        bindService(new Intent(this, SlideShowService.class), mServiceConnection,
-            Service.BIND_AUTO_CREATE);
+        bindService(slideShow, mServiceConnection, Service.BIND_AUTO_CREATE);
     }
 
     @Override

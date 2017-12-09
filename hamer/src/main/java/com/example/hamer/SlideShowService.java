@@ -3,7 +3,6 @@ package com.example.hamer;
 import android.app.Service;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -11,26 +10,26 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.transition.Slide;
 import android.util.Log;
-import java.lang.ref.WeakReference;
 
 public class SlideShowService extends Service{
 		private static final String TAG = "MyLogs SlideShowService";
 
-		public static final String ACTION_SLIDESHOW = "Slide Show";
-		public static final String ACTION_NEXT_IMAGE = "Next Image";
-		public static final String ACTION_PREVIOUS_IMAGE = "Previous Image";
+		public static final byte ACTION_SLIDESHOW_START = 1;
+		public static final byte ACTION_PREVIOUS_IMAGE = 2;
+		public static final byte ACTION_NEXT_IMAGE = 3;
 
-		private String mAction;
 		private Messenger mServiceMessenger;
 		private HandlerThread mHandlerThread;
+		private Handler mBackgroundHandler;
+		private boolean isSlideShowRunning = false;
 
 		public SlideShowService() {
 		}
 
 		@Override public IBinder onBind(Intent intent) {
 				Log.d(TAG, "onBind: ");
-				mAction = intent.getAction();
 				return mServiceMessenger.getBinder();
 		}
 
@@ -41,23 +40,27 @@ public class SlideShowService extends Service{
 				mHandlerThread = new HandlerThread("BackgroundThread");
 				mHandlerThread.start();
 
-				final Handler backgroundHandler = new Handler(mHandlerThread.getLooper()) {
+				mBackgroundHandler = new Handler(mHandlerThread.getLooper()) {
 						@Override public void handleMessage(Message clientRequestMessage) {
-								switch (mAction){
-										case ACTION_SLIDESHOW:
-												startSlideShow(clientRequestMessage);
+								byte action = clientRequestMessage.getData().getByte("action");
+								Log.d(TAG, "handleMessage: action = " + action);
+								switch(action){
+										case ACTION_SLIDESHOW_START:
+												slideShow(clientRequestMessage);
 												break;
 										case ACTION_NEXT_IMAGE:
-												nextImage(clientRequestMessage);
+												nextImageAction(clientRequestMessage);
 												break;
 										case ACTION_PREVIOUS_IMAGE:
-												previousImage(clientRequestMessage);
+												previousImageAction(clientRequestMessage);
 												break;
 								}
 						}
 				};
-				mServiceMessenger = new Messenger(backgroundHandler);
+				mServiceMessenger = new Messenger(mBackgroundHandler);
 		}
+
+
 
 		@Override public int onStartCommand(Intent intent, int flags, int startId) {
 				Log.d(TAG, "onStartCommand. Service = " + this.hashCode());
@@ -66,6 +69,7 @@ public class SlideShowService extends Service{
 
 		@Override public boolean onUnbind(Intent intent) {
 				Log.d(TAG, "onUnbind:");
+				isSlideShowRunning = false;
 				mHandlerThread.quit();
 				mHandlerThread.interrupt();
 				return super.onUnbind(intent);
@@ -77,36 +81,54 @@ public class SlideShowService extends Service{
 		}
 
 		//----------------------------------------------------------------------------------------------
-		private void startSlideShow(Message clientMessage){
+		private void slideShow(Message clientMessage){
+				isSlideShowRunning = true;
 				Uri currentImageUri = clientMessage.getData().getParcelable("uri");
 
 				try {
-						while (true) {
-								Log.d(TAG, "handleMessage(). Long running task in Service = " + SlideShowService.this.hashCode());
-								Thread.currentThread().sleep(4000);
-								currentImageUri = getNextImage(currentImageUri);
-								sendImageUriToActivity(currentImageUri, clientMessage);
-						}
+						Log.d(TAG, "handleMessage(). Long running task in Service = " + SlideShowService.this.hashCode());
+						Thread.currentThread().sleep(4000);
+						currentImageUri = getNextImage(currentImageUri);
+						sendMessageToActivity(currentImageUri, clientMessage);
+						//Process next image on the Service Handler
+						sendMessageToService(currentImageUri, clientMessage, ACTION_SLIDESHOW_START);
 				} catch (InterruptedException ie) {
 						Log.d(TAG, "handleMessage INTERRUPTED:");
 				}
 		}
 
-		private void previousImage(Message clientMessage) {
+		private void previousImageAction(Message clientMessage) {
 				Uri currentImageUri = clientMessage.getData().getParcelable("uri");
-				Uri nextImageUri = getPreviousImage(currentImageUri);
-				sendImageUriToActivity(nextImageUri, clientMessage);
-				//TODO Need to unbind the service at the end
+
+				if(isSlideShowRunning){
+						mHandlerThread.interrupt();
+						Uri previousImageUri = getPreviousImage(currentImageUri);
+						sendMessageToActivity(previousImageUri, clientMessage);
+						mHandlerThread.start();
+						sendMessageToService(previousImageUri, clientMessage, ACTION_SLIDESHOW_START);
+				}else {
+						Uri previousImageUri = getPreviousImage(currentImageUri);
+						sendMessageToActivity(previousImageUri, clientMessage);
+				}
 		}
 
-		private void nextImage(Message clientMessage) {
+		private void nextImageAction(Message clientMessage) {
 				Uri currentImageUri = clientMessage.getData().getParcelable("uri");
-				Uri nextImageUri = getNextImage(currentImageUri);
-				sendImageUriToActivity(nextImageUri, clientMessage);
-				//TODO Need to unbind the service at the end
+
+				if(isSlideShowRunning){
+						Log.d(TAG, "nextImageAction: Interrupting the Thread");
+						mHandlerThread.interrupt();
+						Uri nextImageUri = getNextImage(currentImageUri);
+						sendMessageToActivity(nextImageUri, clientMessage);
+						mHandlerThread.start();
+						sendMessageToService(nextImageUri, clientMessage, ACTION_SLIDESHOW_START);
+				}else {
+						Uri previousImageUri = getPreviousImage(currentImageUri);
+						sendMessageToActivity(previousImageUri, clientMessage);
+				}
 		}
 
-		private void sendImageUriToActivity(Uri imageUri, Message message){
+		private void sendMessageToActivity(Uri imageUri, Message message){
 				Bundle replyData = new Bundle();
 				replyData.putParcelable("uri", imageUri);
 				Message serviceReplyMessage = Message.obtain();
@@ -118,7 +140,17 @@ public class SlideShowService extends Service{
 				}
 		}
 
+		private void sendMessageToService(Uri imageUri, Message message, byte action){
+				Bundle data = new Bundle();
+				data.putParcelable("uri", imageUri);
+				data.putByte("action", action);
+				message.setData(data);
+				mBackgroundHandler.handleMessage(message);
+		}
 
+		/**
+		 * Potentially long running task
+		 */
 		private Uri getNextImage(Uri currentImageUri) {
 				int currentImageId = Integer.parseInt(currentImageUri.getLastPathSegment());
 				String baseUri = currentImageUri.toString()
@@ -132,6 +164,9 @@ public class SlideShowService extends Service{
 				return nextImageUri;
 		}
 
+		/**
+		 * Potentially long running task
+		 */
 		private Uri getPreviousImage(Uri currentImageUri) {
 				int currentImageId = Integer.parseInt(currentImageUri.getLastPathSegment());
 				String baseUri = currentImageUri.toString()
