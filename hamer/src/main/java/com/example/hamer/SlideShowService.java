@@ -21,16 +21,12 @@ public class SlideShowService extends Service{
 		public static final byte ACTION_NEXT_IMAGE = 3;
 
 		private Messenger mServiceMessenger;
+		private Messenger mClientMessenger;
 		private HandlerThread mHandlerThread;
 		private Handler mBackgroundHandler;
 		private boolean isSlideShowRunning = false;
 
 		public SlideShowService() {
-		}
-
-		@Override public IBinder onBind(Intent intent) {
-				Log.d(TAG, "onBind: ");
-				return mServiceMessenger.getBinder();
 		}
 
 		@Override public void onCreate() {
@@ -42,17 +38,21 @@ public class SlideShowService extends Service{
 
 				mBackgroundHandler = new Handler(mHandlerThread.getLooper()) {
 						@Override public void handleMessage(Message clientRequestMessage) {
+								if(mClientMessenger == null){
+										mClientMessenger = clientRequestMessage.replyTo;
+								}
+								Uri currentImageUri = clientRequestMessage.getData().getParcelable("uri");
 								byte action = clientRequestMessage.getData().getByte("action");
 								Log.d(TAG, "handleMessage: action = " + action);
 								switch(action){
 										case ACTION_SLIDESHOW_START:
-												slideShow(clientRequestMessage);
+												slideShow(currentImageUri);
 												break;
 										case ACTION_NEXT_IMAGE:
-												nextImageAction(clientRequestMessage);
+												nextImageAction(currentImageUri);
 												break;
 										case ACTION_PREVIOUS_IMAGE:
-												previousImageAction(clientRequestMessage);
+												previousImageAction(currentImageUri);
 												break;
 								}
 						}
@@ -60,92 +60,70 @@ public class SlideShowService extends Service{
 				mServiceMessenger = new Messenger(mBackgroundHandler);
 		}
 
-
-
-		@Override public int onStartCommand(Intent intent, int flags, int startId) {
-				Log.d(TAG, "onStartCommand. Service = " + this.hashCode());
-				return super.onStartCommand(intent, flags, startId);
+		@Override public IBinder onBind(Intent intent) {
+				Log.d(TAG, "onBind: ");
+				return mServiceMessenger.getBinder();
 		}
 
 		@Override public boolean onUnbind(Intent intent) {
 				Log.d(TAG, "onUnbind:");
 				isSlideShowRunning = false;
+				mBackgroundHandler.removeCallbacksAndMessages(null);
 				mHandlerThread.quit();
-				mHandlerThread.interrupt();
 				return super.onUnbind(intent);
 		}
 
-		@Override public void onDestroy() {
-				Log.d(TAG, "Destroy Service");
-				super.onDestroy();
-		}
-
 		//----------------------------------------------------------------------------------------------
-		private void slideShow(Message clientMessage){
+		private void slideShow(Uri currentImageUri){
+				Log.d(TAG, "handleMessage(). Long running task in Service = " + SlideShowService.this.hashCode());
 				isSlideShowRunning = true;
-				Uri currentImageUri = clientMessage.getData().getParcelable("uri");
+				sendMessageToActivity(currentImageUri);
 
-				try {
-						Log.d(TAG, "handleMessage(). Long running task in Service = " + SlideShowService.this.hashCode());
-						Thread.currentThread().sleep(4000);
-						currentImageUri = getNextImage(currentImageUri);
-						sendMessageToActivity(currentImageUri, clientMessage);
-						//Process next image on the Service Handler
-						sendMessageToService(currentImageUri, clientMessage, ACTION_SLIDESHOW_START);
-				} catch (InterruptedException ie) {
-						Log.d(TAG, "handleMessage INTERRUPTED:");
-				}
+				currentImageUri = getNextImage(currentImageUri);
+				sendMessageToService(currentImageUri, ACTION_SLIDESHOW_START, 2000);
 		}
 
-		private void previousImageAction(Message clientMessage) {
-				Uri currentImageUri = clientMessage.getData().getParcelable("uri");
-
+		private void previousImageAction(Uri currentImageUri){
+				mBackgroundHandler.removeCallbacksAndMessages(null);
+				Uri previousImageUri = getPreviousImage(currentImageUri);
 				if(isSlideShowRunning){
-						mHandlerThread.interrupt();
-						Uri previousImageUri = getPreviousImage(currentImageUri);
-						sendMessageToActivity(previousImageUri, clientMessage);
-						mHandlerThread.start();
-						sendMessageToService(previousImageUri, clientMessage, ACTION_SLIDESHOW_START);
-				}else {
-						Uri previousImageUri = getPreviousImage(currentImageUri);
-						sendMessageToActivity(previousImageUri, clientMessage);
+						sendMessageToService(previousImageUri, ACTION_SLIDESHOW_START, 0);
+				}else{
+						sendMessageToActivity(previousImageUri);
 				}
 		}
 
-		private void nextImageAction(Message clientMessage) {
-				Uri currentImageUri = clientMessage.getData().getParcelable("uri");
-
+		private void nextImageAction(Uri currentImageUri) {
+				mBackgroundHandler.removeCallbacksAndMessages(null);
+				Uri nextImageUri = getNextImage(currentImageUri);
 				if(isSlideShowRunning){
-						Log.d(TAG, "nextImageAction: Interrupting the Thread");
-						mHandlerThread.interrupt();
-						Uri nextImageUri = getNextImage(currentImageUri);
-						sendMessageToActivity(nextImageUri, clientMessage);
-						mHandlerThread.start();
-						sendMessageToService(nextImageUri, clientMessage, ACTION_SLIDESHOW_START);
-				}else {
-						Uri previousImageUri = getPreviousImage(currentImageUri);
-						sendMessageToActivity(previousImageUri, clientMessage);
+						sendMessageToService(nextImageUri, ACTION_SLIDESHOW_START, 0);
+				}else{
+						sendMessageToActivity(nextImageUri);
 				}
 		}
 
-		private void sendMessageToActivity(Uri imageUri, Message message){
-				Bundle replyData = new Bundle();
-				replyData.putParcelable("uri", imageUri);
-				Message serviceReplyMessage = Message.obtain();
-				serviceReplyMessage.setData(replyData);
+		private void sendMessageToActivity(Uri imageUri){
+				Bundle clientData = new Bundle();
+				clientData.putParcelable("uri", imageUri);
+				Message clientMessage = Message.obtain();
+				clientMessage.setData(clientData);
 				try {
-						message.replyTo.send(serviceReplyMessage);
+						if(mClientMessenger != null){
+								mClientMessenger.send(clientMessage);
+						}
 				} catch (RemoteException re) {
 						Log.d(TAG, "handleMessage: " + re.getMessage());
 				}
 		}
 
-		private void sendMessageToService(Uri imageUri, Message message, byte action){
+		private void sendMessageToService(Uri imageUri, byte action, int delay){
+				Message message = Message.obtain(mBackgroundHandler);
 				Bundle data = new Bundle();
 				data.putParcelable("uri", imageUri);
 				data.putByte("action", action);
 				message.setData(data);
-				mBackgroundHandler.handleMessage(message);
+				mBackgroundHandler.sendMessageDelayed(message, delay);
 		}
 
 		/**

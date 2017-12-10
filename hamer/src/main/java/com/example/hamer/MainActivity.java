@@ -21,28 +21,10 @@ import butterknife.ButterKnife;
 import butterknife.OnClick;
 import com.bumptech.glide.Glide;
 import java.lang.ref.WeakReference;
+import java.util.Locale;
 
 public class
-MainActivity extends AppCompatActivity{
-		private static class ActivityHandler extends Handler{
-				private final WeakReference<MainActivity> mActivity;
-
-				public ActivityHandler(MainActivity activity) {
-						this.mActivity = new WeakReference<>(activity);
-				}
-
-				@Override public void handleMessage(Message msg) {
-						Uri newImageUri = msg.getData().getParcelable("uri");
-						Log.d(TAG, "handleMessage: newImageUri = " + newImageUri);
-						MainActivity activity = mActivity.get();
-						if(activity != null){
-								activity.mCurrentImageUri = newImageUri;
-								Glide.with(activity).load(newImageUri).into(activity.mSlideImage);
-						}
-				}
-		}
-
-		//----------------------------------------------------------------------------------------------
+MainActivity extends AppCompatActivity implements OnImageReceived{
 		private static final String TAG = "MyLogs MainActivity";
 
 		public static final String KEY_CURRENT_IMAGE_URI = "mCurrentImageUri";
@@ -73,7 +55,6 @@ MainActivity extends AppCompatActivity{
 						mServiceMessenger = null;
 				}
 		};
-
 		//----------------------------------------------------------------------------------------------
 		@Override
 		protected void onCreate(Bundle savedInstanceState) {
@@ -83,7 +64,9 @@ MainActivity extends AppCompatActivity{
 						mCurrentImageUri = savedInstanceState.getParcelable(KEY_CURRENT_IMAGE_URI);
 				} else {
 						isSlideShowRunning = false;
-						mCurrentImageUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.cat1);
+						String packageName = getPackageName();
+						String defaultImage = String.format(Locale.US,"android.resource://%s/%d", packageName, R.raw.cat1);
+						mCurrentImageUri = Uri.parse(defaultImage);
 				}
 				setContentView(R.layout.activity_main);
 				ButterKnife.bind(this);
@@ -105,8 +88,8 @@ MainActivity extends AppCompatActivity{
 		protected void onPause() {
 				super.onPause();
 				Log.d(TAG, "onPause: stopMyService");
-				stopMyService();
 				if (isSlideShowRunning) {
+						stopMyService();
 						mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_play));
 				}
 		}
@@ -117,12 +100,14 @@ MainActivity extends AppCompatActivity{
 				outState.putBoolean(KEY_IS_SLIDESHOW_RUNNING, isSlideShowRunning);
 				outState.putParcelable(KEY_CURRENT_IMAGE_URI, mCurrentImageUri);
 		}
+
+		@Override public void imageReceived(Uri imageUri) {
+				mCurrentImageUri = imageUri;
+				Glide.with(this).load(imageUri).into(mSlideImage);
+		}
 		//----------------------------------------------------------------------------------------------
 		private void startMyService() {
 				Intent slideShow = new Intent(this, SlideShowService.class);
-				//TODO не понял зачем в примере следующие две строчки
-				//slideShow.setPackage(getApplicationContext().getPackageName());
-				//slideShow.setClass(this, SlideShowService.class);
 				bindService(slideShow, mServiceConnection, Service.BIND_AUTO_CREATE);
 				Log.d(TAG, "startMyService: bindService Requested");
 		}
@@ -153,7 +138,6 @@ MainActivity extends AppCompatActivity{
 				}
 		}
 		//----------------------------------------------------------------------------------------------
-
 		@OnClick(R.id.btn_main_previous)
 		public void btnPreviousClick() {
 				mAction = SlideShowService.ACTION_PREVIOUS_IMAGE;
@@ -190,6 +174,24 @@ MainActivity extends AppCompatActivity{
 						mAction = -1;
 						stopMyService();
 						mSlideshowButton.setBackground(this.getResources().getDrawable(android.R.drawable.ic_media_play));
+				}
+		}
+
+
+		//==============================================================================================
+		private static class ActivityHandler extends Handler{
+				private final WeakReference<OnImageReceived> mImageReceiverRef;
+
+				public ActivityHandler(OnImageReceived imageReceiver) {
+						this.mImageReceiverRef = new WeakReference<>(imageReceiver);
+				}
+
+				@Override public void handleMessage(Message msg) {
+						Uri newImageUri = msg.getData().getParcelable("uri");
+						OnImageReceived imageReceiver = mImageReceiverRef.get();
+						if(imageReceiver != null){
+								imageReceiver.imageReceived(newImageUri);
+						}
 				}
 		}
 }
